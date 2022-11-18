@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+   db:    
+      image: mysql:5.7.16
+      container_name: mysql
+      env_file:
+         - .env
+      environment:
+         - MYSQL_ROOT_USER=${MYSQL_ROOT_USER}
+         - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+         - MYSQL_DATABASE=${MYSQL_DATABASE}
+      ports:
+         - '3306:3306'                 
+      volumes:         
+         - "${DB_DATA_PATH_MYSQL}/database/data:/var/lib/mysql:rw"
+         - "${DB_DATA_PATH_MYSQL}/database/init_script/init.sql:/docker-entrypoint-initdb.d/init.sql"
+      
+         
+   app:
+     build: 
+        context: .
+        dockerfile: Dockerfile
+     image: tensorflow-gpu
+     container_name: ann-electric-load 
+     links:
+            - "db"       
+     ports:
+            - "8888:8888"
+     deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ gpu ]
+     volumes:
+      - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
+     # mantém o container aberto, se o mesmo não executa um script
+     tty: true
+   
+volumes:
+   mysql-data:
+
