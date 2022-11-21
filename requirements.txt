@@ -1,0 +1,6 @@
+PyMySQL
+SQLAlchemy
+scikit-image 
+scikit-learn 
+seaborn
+ipython-sql
