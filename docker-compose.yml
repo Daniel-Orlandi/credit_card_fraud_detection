@@ -2,7 +2,7 @@ version: '3.8'
 services:
    db:    
       image: mysql:5.7.16
-      container_name: mysql
+      container_name: credit-card-db
       env_file:
          - .env
       environment:
@@ -16,12 +16,13 @@ services:
          - "${DB_DATA_PATH_MYSQL}/database/init_script/init.sql:/docker-entrypoint-initdb.d/init.sql"
       
          
-   app:
+   app-gpu:
      build: 
         context: .
         dockerfile: Dockerfile
+     profiles: ["GPU"]
      image: tensorflow-gpu
-     container_name: ann-electric-load 
+     container_name: tensorflow-gpu     
      links:
             - "db"       
      ports:
@@ -32,6 +33,22 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ gpu ]
+     volumes:
+      - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
+     # mantém o container aberto, se o mesmo não executa um script
+     tty: true
+   
+   app-cpu:
+     build: 
+        context: .
+        dockerfile: Dockerfile
+     profiles: ["CPU"]
+     image: tensorflow-cpu
+     container_name: tensorflow-cpu     
+     links:
+            - "db"       
+     ports:
+            - "8888:8888"      
      volumes:
       - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
      # mantém o container aberto, se o mesmo não executa um script
