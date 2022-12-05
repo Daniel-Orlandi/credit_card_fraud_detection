@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:latest-gpu-py3-jupyter
+FROM tensorflow/tensorflow:2.6.1-gpu-jupyter
 ENV PYTHONUNBUFFERED=1
 WORKDIR /usr/src/app
     

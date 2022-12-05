@@ -19,8 +19,7 @@ services:
    app-gpu:
      build: 
         context: .
-        dockerfile: Dockerfile
-     profiles: ["GPU"]
+        dockerfile: Dockerfile     
      image: tensorflow-gpu
      container_name: tensorflow-gpu     
      links:
@@ -37,23 +36,7 @@ services:
       - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
      # mantém o container aberto, se o mesmo não executa um script
      tty: true
-   
-   app-cpu:
-     build: 
-        context: .
-        dockerfile: Dockerfile
-     profiles: ["CPU"]
-     image: tensorflow-cpu
-     container_name: tensorflow-cpu     
-     links:
-            - "db"       
-     ports:
-            - "8888:8888"      
-     volumes:
-      - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
-     # mantém o container aberto, se o mesmo não executa um script
-     tty: true
-   
+
 volumes:
    mysql-data:
 
