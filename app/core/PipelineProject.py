@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.metrics import (
     accuracy_score,
     recall_score,
@@ -32,6 +32,7 @@ class PrepareDataAndTrainingModels:
         self.fitted_models = None
         self.kwargs = kwargs
 
+
     def get_name_cat_and_num_cols(self)->None:
         """
         This method get names of columns categorical and numerical columns.
@@ -62,6 +63,7 @@ class PrepareDataAndTrainingModels:
             self.dataframe.drop(possible_cat_cols, axis=1).columns,
         )
 
+
     def splitting_data(self, **kwargs)->None:
         X = self.dataframe.drop(self.target, axis=1)
         Y = self.dataframe[self.target]
@@ -86,30 +88,47 @@ class PrepareDataAndTrainingModels:
                     self.Y_train,
                 )    
 
+
     def pre_process_data(self):
         if self.is_only_num_cols:
             self.X_train, self.X_test, self.Y_train, self.Y_test = self.balance_data()
             self.X_train = self.kwargs["scaler"].fit_transform(self.X_train)
             self.X_test = self.kwargs["scaler"].fit_transform(self.X_test)
-            
 
-    def fit_models(self)->None:        
+
+    def cross_validation(self, predictor, **kwargs):
+        return cross_val_score(predictor,self.X_train, self.Y_train, **kwargs)
+
+
+    def fit_models(self, grid_search_cv=False, param=None, cv = 5, n_jobs=-1)->None:        
         models = self.kwargs["models"]
         fitted_models = dict()      
         for _, model in enumerate(models):            
             predictor = model
-            predictor.fit(self.X_train, self.Y_train)
-            fitted_models[str(model)] = predictor        
+            if(grid_search_cv==True):
+                if (param == None):
+                    raise AttributeError(f"If grid_search_cv is True, param cannot be None. param = {param}.")
+                predictor = GridSearchCV(predictor, param, cv, n_jobs)
+                predictor.fit(self.X_train, self.Y_train)
+                fitted_models[str(model)] = predictor.best_estimator_ 
+
+            else:                
+                predictor.fit(self.X_train, self.Y_train)
+                fitted_models[str(model)] = predictor
+
         self.fitted_models=pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
 
 
     def fit_models_cv(self)->None:        
         models = self.kwargs["models"]
-        fitted_models = dict()      
-        for _, model in enumerate(models):            
-            predictor = model
-            predictor.fit(self.X_train, self.Y_train)
-            fitted_models[str(model)] = predictor        
+        fitted_models = dict()        
+        
+        for _, model in enumerate(models):
+            predictor = model            
+            scores_ = self.cross_validation(predictor,cv=5, scoring=self.kwargs["score_metric"])
+            print(f"Metric: {self.kwargs['score_metric']} - {scores_.mean()}")
+            print(f"#" * 50)
+
         self.fitted_models=pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
 
 
@@ -145,32 +164,4 @@ class PrepareDataAndTrainingModels:
             pd.DataFrame(score_models)
             .T.reset_index()
             .rename(columns={"index": "model"})
-        )
-
-
-   
-
-    def avaliate_models_cv(self, **kwargs):
-        score_models = dict()
-        models = self.kwargs["models"]
-        X_train, X_test, Y_train, Y_test = self.pre_process_data()
-        for _, model in enumerate(models):
-            print(f"Model training: {str(model)}\n\n")
-            score_models[str(model)] = dict()
-            predictor = model
-            predictor.fit(X_train, Y_train)
-            prediction = predictor.predict(X_test)
-            score_models[str(model)]["accuracy"] = accuracy_score(Y_test, prediction)
-            score_models[str(model)]["precision"] = precision_score(Y_test, prediction)
-            score_models[str(model)]["recall"] = recall_score(Y_test, prediction)
-            score_models[str(model)]["f1_score"] = f1_score(Y_test, prediction)
-            scores_ = cross_val_score(
-                predictor, X_train, Y_train, cv=5, scoring=self.kwargs["score_metric"]
             )
-            print(f"Metric: {self.kwargs['score_metric']} - {scores_.mean()}")
-            print(f"#" * 50)
-        return (
-            pd.DataFrame(score_models)
-            .T.reset_index()
-            .rename(columns={"index": "model"})
-        )
