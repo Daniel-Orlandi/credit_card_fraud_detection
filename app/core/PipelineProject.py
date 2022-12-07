@@ -100,37 +100,34 @@ class PrepareDataAndTrainingModels:
         return cross_val_score(predictor,self.X_train, self.Y_train, **kwargs)
 
 
-    def fit_models(self, grid_search_cv=False, param=None, cv = 5, n_jobs=-1)->None:        
+    def fit_models(self, 
+                   cross_val=False,
+                   grid_search_cv=False,
+                   param=None,
+                   cv = 5,
+                   n_jobs=-1)->pd.DataFrame:        
         models = self.kwargs["models"]
         fitted_models = dict()      
         for _, model in enumerate(models):            
             predictor = model
-            if(grid_search_cv==True):
+            if(grid_search_cv == True):
                 if (param == None):
                     raise AttributeError(f"If grid_search_cv is True, param cannot be None. param = {param}.")
                 predictor = GridSearchCV(predictor, param, cv, n_jobs)
                 predictor.fit(self.X_train, self.Y_train)
                 fitted_models[str(model)] = predictor.best_estimator_ 
+            
+            elif (cross_val == True):
+                fitted_models = self.cross_validation(predictor, cv, scoring=self.kwargs["score_metric"])
+                print(f"Metric: {self.kwargs['score_metric']} - {fitted_models.mean()}")
+                print(f"#" * 50)
 
             else:                
                 predictor.fit(self.X_train, self.Y_train)
                 fitted_models[str(model)] = predictor
 
         self.fitted_models=pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
-
-
-    def fit_models_cv(self)->None:        
-        models = self.kwargs["models"]
-        fitted_models = dict()        
-        
-        for _, model in enumerate(models):
-            predictor = model            
-            scores_ = self.cross_validation(predictor,cv=5, scoring=self.kwargs["score_metric"])
-            print(f"Metric: {self.kwargs['score_metric']} - {scores_.mean()}")
-            print(f"#" * 50)
-
-        self.fitted_models=pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
-
+    
 
     def predict(self)->pd.DataFrame:        
         models = self.kwargs["models"]
