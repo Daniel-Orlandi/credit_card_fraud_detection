@@ -11,11 +11,12 @@ class SQLeto:
         self.database = database
         self.user = user
         self.pwd = password
+        self.url = f"postgresql://{self.user}:{self.pwd}@db:5432/{self.database}"
 
     @classmethod
     def create_engine(self) -> sql.engine.Engine:
 
-        url = f"postgresql://{self.user}:{self.pwd}@localhost:15432/{self.database}"
+        url = self.url
         engine = sql.create_engine(url)
 
         return engine
@@ -42,7 +43,7 @@ class SQLeto:
         list_paths = glob.glob(path + "*.csv")
         list_names = list()
         for file_path in list_paths:
-            name_file = file_path.split("\\")[-1]
+            name_file = file_path.split("/")[-1]
             name_dataframe = name_file.replace(".csv", "")
             list_names.append(name_dataframe)
 
