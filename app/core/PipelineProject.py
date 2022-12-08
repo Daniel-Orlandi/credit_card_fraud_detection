@@ -90,8 +90,11 @@ class PrepareDataAndTrainingModels:
 
 
     def pre_process_data(self):
-        if self.is_only_num_cols:
-            self.X_train, self.X_test, self.Y_train, self.Y_test = self.balance_data()
+        if (not self.X_train ):
+            self.splitting_data()
+
+        if self.is_only_num_cols:            
+            self.balance_data()
             self.X_train = self.kwargs["scaler"].fit_transform(self.X_train)
             self.X_test = self.kwargs["scaler"].fit_transform(self.X_test)
 

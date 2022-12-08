@@ -4,3 +4,5 @@ scikit-learn==1.1
 seaborn
 python-decouple==3.6
 psycopg2-binary
+xgboost
+imblearn
