@@ -1,29 +1,59 @@
 version: '3.8'
 services:
-   db:    
-      image: mysql:5.7.16
-      container_name: credit-card-db
-      env_file:
-         - .env
+   postgres-init:
+    image: postgres:14
+    volumes:
+      - "postgres_data:/data"
+    entrypoint:
+      - sh
+      - -c
+      - |
+        chown -R 2000:2000 /data
+
+   postgres-compose:
+    container_name: credit_card_db
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    image: postgres
+    env_file:
+      - .env      
+    environment:
+      POSTGRES_USER: ${USER_POSTGRES}
+      POSTGRES_PASSWORD: ${PWD_POSTGRES}
+      POSTGRES_DB: ${DATABASE_POSTGRES}
+      PGDATA: /pgdata
+    ports:
+      - "15432:5432"
+    volumes:
+      #- ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - "postgres_data:/pgdata"
+    user: "2000"
+    networks:
+      - postgres-compose-network
+
+   pgadmin-compose:
+      image: dpage/pgadmin4
       environment:
-         - MYSQL_ROOT_USER=${MYSQL_ROOT_USER}
-         - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-         - MYSQL_DATABASE=${MYSQL_DATABASE}
+         PGADMIN_DEFAULT_EMAIL: ${EMAIL_PGADMIN}
+         PGADMIN_DEFAULT_PASSWORD: ${PWD_PGADMIN}
       ports:
-         - '3306:3306'                 
-      volumes:         
-         - "${DB_DATA_PATH_MYSQL}/database/data:/var/lib/mysql:rw"
-         - "${DB_DATA_PATH_MYSQL}/database/init_script/init.sql:/docker-entrypoint-initdb.d/init.sql"
-      
+         - "16543:80"
+      depends_on:
+         - postgres-compose
+      networks:
+         - postgres-compose-network     
          
    app-gpu:
      build: 
         context: .
         dockerfile: Dockerfile     
      image: tensorflow-gpu
-     container_name: tensorflow-gpu     
+     container_name: tensorflow-gpu
+     env_file:
+      - .env     
      links:
-            - "db"       
+            - "postgres-compose"       
      ports:
             - "8888:8888"
      deploy:
@@ -33,10 +63,14 @@ services:
             - driver: nvidia
               capabilities: [ gpu ]
      volumes:
-      - ${DB_DATA_PATH_MYSQL}/app:/usr/src/app
+      - ./app:/usr/src/app
      # mantém o container aberto, se o mesmo não executa um script
      tty: true
 
+networks:
+   postgres-compose-network:
+      driver: bridge
+
 volumes:
-   mysql-data:
+  postgres_data:
 
