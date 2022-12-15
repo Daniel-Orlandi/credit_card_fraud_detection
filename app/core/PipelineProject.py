@@ -1,12 +1,8 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
-from sklearn.metrics import (
-    accuracy_score,
-    recall_score,
-    f1_score,
-    precision_score,
-    roc_auc_score
-)
+from sklearn.model_selection import (train_test_split,
+                                     cross_validate,
+                                     GridSearchCV)
+from sklearn import preprocessing
 
 
 class PrepareDataAndTrainingModels:
@@ -32,17 +28,14 @@ class PrepareDataAndTrainingModels:
         self.fitted_models = None
         self.kwargs = kwargs
 
-
-    def get_name_cat_and_num_cols(self)->None:
+    def get_name_cat_and_num_cols(self) -> None:
         """
         This method get names of columns categorical and numerical columns.
         """
         if self.is_only_num_cols:
             return (
                 type(self.dataframe[self.dataframe.columns].columns),
-                self.dataframe[self.dataframe.columns]
-                .drop(self.target, axis=1)
-                .columns,
+                self.dataframe[self.dataframe.columns].drop(self.target, axis=1).columns,
             )
 
         possible_cat_cols = list()
@@ -50,6 +43,7 @@ class PrepareDataAndTrainingModels:
         for i, type_ in enumerate(self.dataframe.dtypes):
             if type_ == object:
                 possible_cat_cols.append(self.dataframe.iloc[:, i].name)
+                
             elif type_ == pd.CategoricalDtype.name:
                 possible_cat_cols.append(self.dataframe.iloc[:, i].name)
 
@@ -63,105 +57,106 @@ class PrepareDataAndTrainingModels:
             self.dataframe.drop(possible_cat_cols, axis=1).columns,
         )
 
-
-    def splitting_data(self, **kwargs)->None:
+    def splitting_data(self, standart_scale=False, **kwargs) -> None:
         X = self.dataframe.drop(self.target, axis=1)
+        if (standart_scale == True):
+            X = preprocessing.StandardScaler().fit(X).transform(X)
+
         Y = self.dataframe[self.target]
         self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(
-            X, Y,random_state=self.random_state, test_size=self.test_size,**kwargs      
+            X,
+            Y, 
+            random_state=self.random_state,
+            test_size=self.test_size,
+            **kwargs
         )
 
-
     def balance_data(self):
-        qt_classes = (
-            self.dataframe[self.target]
-            .value_counts(ascending=True)
-            .reset_index(drop=True)
-        )        
+        qt_classes = (self.dataframe[self.target].value_counts(ascending=True).reset_index(drop=True))
         if len(qt_classes) == 2:
             print("Its Binary Classification!\n\n")
             print("#" * 50 + "\n\n")
-            if qt_classes[0] / qt_classes[1] < 0.35:
+
+            if ((self.kwargs['balancer'] != None) and (qt_classes[0] / qt_classes[1] < 0.35)):
                 print(f"Using tecnique: {self.kwargs['balancer']}")
                 self.X_train, self.Y_train = self.kwargs["balancer"].fit_resample(
                     self.X_train,
                     self.Y_train,
-                )    
-
+                )
 
     def pre_process_data(self):
-        if (not self.X_train ):
+        if (not self.X_train):
             self.splitting_data()
 
-        if self.is_only_num_cols:            
+        if self.is_only_num_cols:
             self.balance_data()
             self.X_train = self.kwargs["scaler"].fit_transform(self.X_train)
             self.X_test = self.kwargs["scaler"].fit_transform(self.X_test)
 
-
-    def cross_validation(self, predictor, **kwargs):
-        return cross_val_score(predictor,self.X_train, self.Y_train, **kwargs)
-
-
-    def fit_models(self, 
+    def fit_models(self,
                    cross_val=False,
                    grid_search_cv=False,
                    param=None,
-                   cv = 5,
-                   n_jobs=-1)->pd.DataFrame:        
+                   cv=5,
+                   n_jobs=-1) -> pd.DataFrame:
         models = self.kwargs["models"]
-        fitted_models = dict()      
-        for _, model in enumerate(models):            
-            predictor = model
-            if(grid_search_cv == True):
+        fitted_models = dict()
+        for _, model in enumerate(models):
+            if (grid_search_cv == True):                
                 if (param == None):
                     raise AttributeError(f"If grid_search_cv is True, param cannot be None. param = {param}.")
-                predictor = GridSearchCV(predictor, param, cv, n_jobs)
+
+                predictor = GridSearchCV(estimator=model,
+                                         param_grid=param,
+                                         cv=cv,
+                                         n_jobs=n_jobs)
                 predictor.fit(self.X_train, self.Y_train)
-                fitted_models[str(model)] = predictor.best_estimator_ 
-            
+               
+
             elif (cross_val == True):
-                fitted_models = self.cross_validation(predictor, cv, scoring=self.kwargs["score_metric"])
-                print(f"Metric: {self.kwargs['score_metric']} - {fitted_models.mean()}")
-                print(f"#" * 50)
+                predictor = cross_validate(estimator=model,
+                                           X=self.X_train,
+                                           y=self.Y_train,
+                                           cv=cv,
+                                           n_jobs=n_jobs)
+                                                           
+                
+                
+            else:
+                predictor = model.fit(self.X_train, self.Y_train)
+                
+            fitted_models[str(model)] = predictor
 
-            else:                
-                predictor.fit(self.X_train, self.Y_train)
-                fitted_models[str(model)] = predictor
+        self.fitted_models = pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
 
-        self.fitted_models=pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
-    
-
-    def predict(self)->pd.DataFrame:        
+    def predict(self) -> pd.DataFrame:
         models = self.kwargs["models"]
-        predictions = dict()           
-        for _, model in enumerate(models):            
+        predictions = dict()
+        for _, model in enumerate(models):
             predictor = model
             prediction = predictor.predict(self.X_test, self.Y_test)
             predictions[str(model)] = prediction
-        
+
         return (
             pd.DataFrame(prediction)
             .T.reset_index()
             .rename(columns={"index": "model"})
-        )                
-        
-    
-    def compute_scores(self, **kwargs)->pd.DataFrame:
+        )
+
+    def compute_scores(self, **kwargs) -> pd.DataFrame:
         score_models = dict()
         models = self.kwargs["models"]
+        metrics = self.kwargs["score_metric"]
         for _, model in enumerate(models):
             score_models[str(model)] = dict()
             predictor = model
             prediction = predictor.predict(self.X_test)
-            score_models[str(model)]["accuracy"] = accuracy_score(self.Y_test, prediction)
-            score_models[str(model)]["precision"] = precision_score(self.Y_test, prediction)
-            score_models[str(model)]["recall"] = recall_score(self.Y_test, prediction)
-            score_models[str(model)]["f1_score"] = f1_score(self.Y_test, prediction)
-            score_models[str(model)]["roc_auc_score"] = roc_auc_score(self.Y_test, prediction)
+            for _, metric in enumerate(metrics):
+                score_models[str(model)][metric] = metric(
+                    self.Y_test, prediction)
 
         return (
             pd.DataFrame(score_models)
             .T.reset_index()
             .rename(columns={"index": "model"})
-            )
+        )
