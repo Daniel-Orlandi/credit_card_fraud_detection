@@ -1,4 +1,5 @@
 import pandas as pd
+import pickle
 from sklearn.model_selection import (train_test_split,
                                      cross_validate,
                                      GridSearchCV)
@@ -26,7 +27,20 @@ class PrepareDataAndTrainingModels:
         self.X_test = None
         self.Y_test = None
         self.fitted_models = None
+        self.models_predictions = None
         self.kwargs = kwargs
+    
+    @staticmethod
+    def persist_model(model, save_path:str,)->None:
+        with open(save_path, 'wb') as file:
+           pickle.dump(model,file)
+
+        
+    @staticmethod
+    def load_model(load_path:str):
+        with open(load_path, 'rb') as file:
+            model = pickle.load(file)
+        return model
 
     def get_name_cat_and_num_cols(self) -> None:
         """
@@ -127,22 +141,17 @@ class PrepareDataAndTrainingModels:
                 
             fitted_models[str(model)] = predictor
 
-        self.fitted_models = pd.DataFrame(fitted_models).T.reset_index().rename(columns={"index": "model"})
+        self.fitted_models = fitted_models
 
     def predict(self) -> pd.DataFrame:
         models = self.kwargs["models"]
         predictions = dict()
-        for _, model in enumerate(models):
-            predictor = model
-            prediction = predictor.predict(self.X_test, self.Y_test)
-            predictions[str(model)] = prediction
+        for _, model in enumerate(models):                   
+            predictions[str(model)] =model.predict(self.X_test, self.Y_test)
+        
+        self.models_predictions = predictions
 
-        return (
-            pd.DataFrame(prediction)
-            .T.reset_index()
-            .rename(columns={"index": "model"})
-        )
-
+        
     def compute_scores(self, **kwargs) -> pd.DataFrame:
         score_models = dict()
         models = self.kwargs["models"]
@@ -158,5 +167,5 @@ class PrepareDataAndTrainingModels:
         return (
             pd.DataFrame(score_models)
             .T.reset_index()
-            .rename(columns={"index": "model"})
-        )
+            .rename(columns={"index": "model"})                    
+        )   
