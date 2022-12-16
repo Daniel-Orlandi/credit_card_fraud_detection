@@ -16,7 +16,7 @@ class PrepareDataAndTrainingModels:
         test_size: float = 0.3,
         **kwargs,
     ) -> None:
-
+        self.save_path = "models/"
         self.dataframe = dataframe
         self.target = target
         self.is_only_num_cols = is_only_numeric_cols
@@ -110,6 +110,7 @@ class PrepareDataAndTrainingModels:
     def fit_models(self,
                    cross_val=False,
                    grid_search_cv=False,
+                   persist=False,
                    param=None,
                    cv=5,
                    n_jobs=-1) -> pd.DataFrame:
@@ -139,6 +140,8 @@ class PrepareDataAndTrainingModels:
             else:
                 predictor = model.fit(self.X_train, self.Y_train)
                 
+            if (persist==True):
+                    self.persist_model(predictor, f"{self.save_path}+{str(model)}.pkl")   
             fitted_models[str(model)] = predictor
 
         self.fitted_models = fitted_models
